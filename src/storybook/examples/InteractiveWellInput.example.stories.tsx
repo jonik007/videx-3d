@@ -1,9 +1,10 @@
-import { Html, Line, Text } from '@react-three/drei';
+import { CameraControls, Environment, Line, Text } from '@react-three/drei';
+import { Canvas } from '@react-three/fiber';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useMemo, useState } from 'react';
+import { Color, NoToneMapping } from 'three';
 import { BoxGrid } from '../../components/Grids/BoxGrid/BoxGrid';
-import { Vec3 } from '../../sdk';
-import { Canvas3dDecorator } from '../decorators/canvas-3d-decorator';
+import { PI2, Vec3 } from '../../sdk';
 
 type FormationInput = {
   id: string;
@@ -381,9 +382,42 @@ const InteractiveWellInputExample = () => {
   const [wells, setWells] = useState<WellInput[]>(defaultWells);
 
   return (
-    <>
-      <WellScene wells={wells} />
-      <Html fullscreen>
+    <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
+      <Canvas
+        camera={{
+          near: 0.1,
+          far: 10000,
+          position: [1200, 900, 1700],
+          fov: 60,
+        }}
+        dpr={Math.min(2, devicePixelRatio)}
+        gl={{
+          logarithmicDepthBuffer: true,
+          autoClear: true,
+          antialias: true,
+          powerPreference: 'high-performance',
+          toneMapping: NoToneMapping,
+        }}
+        style={{
+          backgroundColor: '#020617',
+          position: 'absolute',
+          inset: 0,
+        }}
+        onCreated={({ scene }) => {
+          scene.background = new Color('#020617');
+        }}
+      >
+        <ambientLight intensity={0.5} />
+        <directionalLight castShadow position={[-1, 2, -3]} intensity={3.2} />
+        <Environment
+          preset="studio"
+          environmentIntensity={1}
+          backgroundRotation={[0, PI2, 0]}
+        />
+        <WellScene wells={wells} />
+        <CameraControls makeDefault />
+      </Canvas>
+
         <form
           style={formPanelStyle}
           onPointerDown={event => event.stopPropagation()}
@@ -438,21 +472,13 @@ const InteractiveWellInputExample = () => {
             />
           ))}
         </form>
-      </Html>
-    </>
+    </div>
   );
 };
 
 const meta = {
   title: 'examples/Interactive well input',
   component: InteractiveWellInputExample,
-  decorators: [Canvas3dDecorator],
-  parameters: {
-    scale: 20,
-    cameraPosition: [1200, 900, 1700],
-    cameraTarget: [0, -700, 0],
-    background: '#020617',
-  },
 } satisfies Meta<typeof InteractiveWellInputExample>;
 
 export default meta;
