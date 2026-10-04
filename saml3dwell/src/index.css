@@ -105,6 +105,49 @@ body {
   font-weight: 600;
 }
 
+.view-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.view-tabs {
+  flex: 0 0 auto;
+  background: #fff;
+  padding: 0 12px;
+}
+
+.view-tabs .ant-tabs-nav {
+  margin-bottom: 0;
+}
+
+.view-tabs .ant-tabs-content-holder {
+  display: none;
+}
+
+.view-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.section-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  background: #f5f7fa;
+  border-bottom: 1px solid #e6e8eb;
+}
+
+.section-stage {
+  position: absolute;
+  inset: 0;
+}
+
 .scene-shell {
   position: absolute;
   inset: 0;

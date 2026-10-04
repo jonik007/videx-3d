@@ -162,6 +162,46 @@ export function gridValueStats(
   };
 }
 
+/** Bilinear sample of the raw grid value. Null outside the grid and on NODATA. */
+export function sampleGrid(
+  grid: EsriAsciiGrid,
+  longitude: number,
+  latitude: number,
+) {
+  const lon0 = grid.xllIsCenter ? grid.xll : grid.xll + grid.dx / 2;
+  const lat0 = grid.yllIsCenter ? grid.yll : grid.yll + grid.dy / 2;
+  const col = (longitude - lon0) / grid.dx;
+  const row = (latitude - lat0) / grid.dy;
+  if (col < -0.5 || row < -0.5 || col > grid.ncols - 0.5 || row > grid.nrows - 0.5) {
+    return null;
+  }
+  const c0 = Math.max(0, Math.min(grid.ncols - 1, Math.floor(col)));
+  const r0 = Math.max(0, Math.min(grid.nrows - 1, Math.floor(row)));
+  const c1 = Math.min(grid.ncols - 1, c0 + 1);
+  const r1 = Math.min(grid.nrows - 1, r0 + 1);
+  const tx = Math.min(1, Math.max(0, col - c0));
+  const ty = Math.min(1, Math.max(0, row - r0));
+  const raw = (c: number, r: number) => {
+    const value = valueAt(grid, c, r);
+    return isNodata(value, grid.nodata) ? null : value;
+  };
+  const samples: [number | null, number][] = [
+    [raw(c0, r0), (1 - tx) * (1 - ty)],
+    [raw(c1, r0), tx * (1 - ty)],
+    [raw(c0, r1), (1 - tx) * ty],
+    [raw(c1, r1), tx * ty],
+  ];
+  let weight = 0;
+  let sum = 0;
+  for (const [value, share] of samples) {
+    if (value === null || share === 0) continue;
+    weight += share;
+    sum += value * share;
+  }
+  if (weight === 0) return null;
+  return sum / weight;
+}
+
 /** Integer step that keeps the displayed lattice near the given cell budget. */
 export function displayStride(ncols: number, nrows: number, budget = 500_000) {
   const cells = ncols * nrows;

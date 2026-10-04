@@ -1,8 +1,69 @@
-import { App as AntApp, ConfigProvider, Grid } from 'antd';
+import { App as AntApp, ConfigProvider, Grid, Select, Tabs, Typography } from 'antd';
 import ruRU from 'antd/locale/ru_RU';
+import { useEffect, useState } from 'react';
 import { Sidebar } from './panels/Sidebar';
 import { SceneView } from './scene/SceneView';
-import { SceneProvider } from './state';
+import { SectionCanvas } from './scene/SectionView';
+import { SceneProvider, useScene } from './state';
+
+function ViewShell() {
+  const { wells } = useScene();
+  const [tab, setTab] = useState<'scene' | 'section'>('scene');
+  const [sectionWellIds, setSectionWellIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    setSectionWellIds(current =>
+      current.filter(id => wells.some(well => well.id === id)),
+    );
+  }, [wells]);
+
+  const order = sectionWellIds.flatMap(id => {
+    const well = wells.find(item => item.id === id);
+    return well ? [well.name] : [];
+  });
+
+  return (
+    <div className="view-shell">
+      <Tabs
+        className="view-tabs"
+        activeKey={tab}
+        onChange={key => setTab(key as 'scene' | 'section')}
+        items={[
+          { key: 'scene', label: 'Сцена' },
+          { key: 'section', label: 'Разрез' },
+        ]}
+      />
+      {tab === 'section' && (
+        <div className="section-bar">
+          <Select
+            mode="multiple"
+            allowClear
+            placeholder="Выберите скважины по порядку"
+            value={sectionWellIds}
+            style={{ minWidth: 260, flex: 1 }}
+            options={wells.map(well => ({ value: well.id, label: well.name }))}
+            onChange={(next: string[]) => {
+              setSectionWellIds(current => {
+                const kept = current.filter(id => next.includes(id));
+                const added = next.filter(id => !current.includes(id));
+                return [...kept, ...added];
+              });
+            }}
+            disabled={!wells.length}
+          />
+          <Typography.Text type="secondary">
+            {order.length
+              ? `Линия разреза: ${order.join(' → ')}`
+              : 'Сначала загрузите устья и выберите скважины'}
+          </Typography.Text>
+        </div>
+      )}
+      <div className="view-stage">
+        {tab === 'scene' ? <SceneView /> : <SectionCanvas wellIds={sectionWellIds} />}
+      </div>
+    </div>
+  );
+}
 
 function Shell() {
   const screens = Grid.useBreakpoint();
@@ -21,7 +82,7 @@ function Shell() {
           <Sidebar />
         </aside>
         <main className="scene-pane">
-          <SceneView />
+          <ViewShell />
         </main>
       </div>
     </div>
