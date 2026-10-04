@@ -13,7 +13,7 @@ function Shell() {
       <header className="app-header">
         <span className="app-title">saml3dwell</span>
         <span className="app-subtitle">
-          Лицензии, устья и поверхности · WGS84
+          Лицензии, устья, поверхности и кубы · WGS84
         </span>
       </header>
       <div className={stacked ? 'app-body stacked' : 'app-body'}>

@@ -1,9 +1,17 @@
 import { Html, Line } from '@react-three/drei';
 import { useEffect, useMemo } from 'react';
+import { CRS } from '../../../src/sdk/projection/crs';
 import { DoubleSide, type BufferGeometry } from 'three';
 import { useScene } from '../state';
-import type { LicenseContour, SurfaceLayer, Wellhead } from '../types';
+import type {
+  LicenseContour,
+  PropertyCube,
+  SurfaceLayer,
+  Wellhead,
+} from '../types';
+import { buildCubeGeometry } from './cube-geometry';
 import { useWgs84Frame } from './Frame';
+import { formatUtmZone, wgs84UtmDef } from './project';
 import {
   buildLicenseFill,
   buildLicenseWalls,
@@ -249,6 +257,81 @@ function SurfaceMesh({ surface }: { surface: SurfaceLayer }) {
         depthWrite={surface.opacity > 0.9 && !surface.wireframe}
       />
     </mesh>
+  );
+}
+
+function CubeMesh({ cube }: { cube: PropertyCube }) {
+  const { toWorld, toUtm, zone } = useWgs84Frame();
+  const { exaggeration } = useScene();
+  const geometry = useMemo(() => {
+    const lift = (elevation: number) => elevation * exaggeration;
+    let project: (x: number, y: number, elevation: number) => WorldPoint;
+    if (cube.coordMode === 'wgs84') {
+      project = (x, y, elevation) => toWorld(x, y, lift(elevation));
+    } else {
+      let sameZone = false;
+      try {
+        sameZone = formatUtmZone(cube.utmZone) === zone;
+      } catch {
+        sameZone = false;
+      }
+      if (sameZone) {
+        project = (x, y, elevation) => toUtm(x, y, lift(elevation));
+      } else {
+        let local: CRS | null = null;
+        try {
+          local = new CRS(wgs84UtmDef(cube.utmZone), [0, 0], 'utm');
+        } catch {
+          local = null;
+        }
+        project = (x, y, elevation) => {
+          if (!local) return toWorld(0, 0, lift(elevation));
+          const [longitude, latitude] = local.utmToWgs84([x, y]);
+          return toWorld(longitude, latitude, lift(elevation));
+        };
+      }
+    }
+    return buildCubeGeometry(cube.grid, cube.property, {
+      depthPositiveDown: cube.depthPositiveDown,
+      iCut: cube.iCut,
+      jCut: cube.jCut,
+      kCut: cube.kCut,
+      project,
+    });
+  }, [cube, exaggeration, toUtm, toWorld, zone]);
+
+  useEffect(() => {
+    return () => geometry?.dispose();
+  }, [geometry]);
+
+  if (!geometry) return null;
+
+  return (
+    <mesh geometry={geometry} renderOrder={2}>
+      <meshStandardMaterial
+        color="#ffffff"
+        vertexColors
+        side={DoubleSide}
+        roughness={0.82}
+        metalness={0}
+        transparent={cube.opacity < 0.999}
+        opacity={cube.opacity}
+        depthWrite={cube.opacity > 0.9}
+      />
+    </mesh>
+  );
+}
+
+export function CubeLayer() {
+  const { cubes } = useScene();
+  return (
+    <group>
+      {cubes
+        .filter(cube => cube.visible)
+        .map(cube => (
+          <CubeMesh key={cube.id} cube={cube} />
+        ))}
+    </group>
   );
 }
 

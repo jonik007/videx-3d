@@ -2,8 +2,14 @@ import {
   CRS,
   getUtmZoneFromLatLng,
 } from '../../../src/sdk/projection/crs';
-import type { LicenseContour, SurfaceLayer, Wellhead } from '../types';
+import { pillarPlanCorners } from '../parsers/grdecl';
 import { gridExtent } from '../parsers/esri-ascii';
+import type {
+  LicenseContour,
+  PropertyCube,
+  SurfaceLayer,
+  Wellhead,
+} from '../types';
 
 /**
  * UTM zone label accepted by the library helper: two digits and a hemisphere.
@@ -40,10 +46,20 @@ export function createSceneCrs(origin: [number, number]) {
   };
 }
 
+export function cubePlanLonLat(
+  cube: Pick<PropertyCube, 'coordMode' | 'utmZone' | 'grid'>,
+): [number, number][] {
+  const corners = pillarPlanCorners(cube.grid);
+  if (cube.coordMode === 'wgs84') return corners;
+  const crs = new CRS(wgs84UtmDef(cube.utmZone), [0, 0], 'utm');
+  return corners.map(([easting, northing]) => crs.utmToWgs84([easting, northing]));
+}
+
 export function datasetOrigin(
   licenses: LicenseContour[],
   wells: Wellhead[],
   surfaces: SurfaceLayer[],
+  cubes: Pick<PropertyCube, 'coordMode' | 'utmZone' | 'grid'>[] = [],
 ): [number, number] | null {
   let lon = 0;
   let lat = 0;
@@ -64,6 +80,15 @@ export function datasetOrigin(
     const extent = gridExtent(surface.grid);
     add(extent.west, extent.south);
     add(extent.east, extent.north);
+  }
+  for (const cube of cubes) {
+    try {
+      for (const [longitude, latitude] of cubePlanLonLat(cube)) {
+        add(longitude, latitude);
+      }
+    } catch {
+      // Некорректная зона UTM не сдвигает начало сцены.
+    }
   }
 
   if (!count) return null;

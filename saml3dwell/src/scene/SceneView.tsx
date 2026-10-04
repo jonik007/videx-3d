@@ -4,9 +4,10 @@ import { useLayoutEffect, useMemo, useRef, type RefObject } from 'react';
 import { Box3, Group, Vector3 } from 'three';
 import { gridExtent } from '../parsers/esri-ascii';
 import { useScene } from '../state';
+import type { PropertyCube } from '../types';
 import { Wgs84Frame } from './Frame';
-import { LicenseLayer, SurfaceLayerMeshes, WellLayer } from './Layers';
-import { createSceneCrs, datasetOrigin } from './project';
+import { CubeLayer, LicenseLayer, SurfaceLayerMeshes, WellLayer } from './Layers';
+import { createSceneCrs, cubePlanLonLat, datasetOrigin } from './project';
 
 function niceStep(span: number) {
   if (!Number.isFinite(span) || span <= 0) return 100;
@@ -23,6 +24,7 @@ function horizontalSpan(
   licenses: ReturnType<typeof useScene>['licenses'],
   wells: ReturnType<typeof useScene>['wells'],
   surfaces: ReturnType<typeof useScene>['surfaces'],
+  cubes: PropertyCube[],
 ) {
   const box = new Box3();
   const add = (longitude: number, latitude: number) => {
@@ -40,6 +42,15 @@ function horizontalSpan(
     const extent = gridExtent(surface.grid);
     add(extent.west, extent.south);
     add(extent.east, extent.north);
+  }
+  for (const cube of cubes) {
+    try {
+      for (const [longitude, latitude] of cubePlanLonLat(cube)) {
+        add(longitude, latitude);
+      }
+    } catch {
+      // Куб с некорректной зоной не входит в размер кадра.
+    }
   }
 
   if (box.isEmpty()) return 1000;
@@ -126,6 +137,7 @@ export function SceneView() {
     licenses,
     wells,
     surfaces,
+    cubes,
     exaggeration,
     showGrid,
     showVolume,
@@ -133,15 +145,18 @@ export function SceneView() {
   } = useScene();
   const content = useRef<Group>(null);
   const origin = useMemo(
-    () => datasetOrigin(licenses, wells, surfaces) ?? ([37.62, 55.75] as [number, number]),
-    [licenses, wells, surfaces],
+    () =>
+      datasetOrigin(licenses, wells, surfaces, cubes) ??
+      ([37.62, 55.75] as [number, number]),
+    [licenses, wells, surfaces, cubes],
   );
   const { crs, zone } = useMemo(() => createSceneCrs(origin), [origin]);
   const span = useMemo(
-    () => horizontalSpan(crs, licenses, wells, surfaces),
-    [crs, licenses, wells, surfaces],
+    () => horizontalSpan(crs, licenses, wells, surfaces, cubes),
+    [crs, licenses, wells, surfaces, cubes],
   );
-  const hasData = licenses.length + wells.length + surfaces.length > 0;
+  const hasData =
+    licenses.length + wells.length + surfaces.length + cubes.length > 0;
   const signature = hasData
     ? [
         licenses
@@ -155,6 +170,12 @@ export function SceneView() {
           .join(','),
         surfaces
           .map(item => `${item.id}:${item.visible}:${item.depthPositiveDown}`)
+          .join(','),
+        cubes
+          .map(
+            item =>
+              `${item.id}:${item.visible}:${item.depthPositiveDown}:${item.coordMode}:${item.utmZone}`,
+          )
           .join(','),
         exaggeration,
         showVolume,
@@ -197,10 +218,11 @@ export function SceneView() {
         <ambientLight intensity={0.72} />
         <hemisphereLight args={['#e7eef5', '#3d342c', 0.4]} />
         <directionalLight position={[4000, 9000, 2500]} intensity={1.7} />
-        <Wgs84Frame crs={crs}>
+        <Wgs84Frame crs={crs} zone={zone}>
           {showGrid && hasData && <Ground span={span} />}
           <group ref={content}>
             <SurfaceLayerMeshes />
+            <CubeLayer />
             <LicenseLayer />
             <WellLayer radius={markerRadius} />
           </group>
@@ -218,7 +240,9 @@ export function SceneView() {
         <div>X — восток, Y — вверх, север — −Z</div>
       </div>
       {!hasData && (
-        <div className="scene-empty">Загрузите контуры, устья или поверхность</div>
+        <div className="scene-empty">
+          Загрузите контуры, устья, поверхность или куб свойств
+        </div>
       )}
     </div>
   );
