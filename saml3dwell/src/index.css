@@ -1,0 +1,145 @@
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: #10161c;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+}
+
+.app-header {
+  display: flex;
+  flex: 0 0 56px;
+  align-items: baseline;
+  gap: 16px;
+  height: 56px;
+  line-height: 56px;
+  padding: 0 20px;
+  background: #0b1f33;
+}
+
+.app-title {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.app-subtitle {
+  color: #9db2c8;
+  font-size: 13px;
+}
+
+.app-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: row;
+  min-height: 0;
+}
+
+.app-body.stacked {
+  flex-direction: column;
+}
+
+.side-panel {
+  flex: 0 0 420px;
+  width: 420px;
+  height: 100%;
+  overflow: auto;
+  background: #f5f7fa;
+  border-right: 1px solid #e6e8eb;
+}
+
+.app-body.stacked .side-panel {
+  flex: 0 0 42vh;
+  width: 100%;
+  height: 42vh;
+  border-right: 0;
+  border-bottom: 1px solid #e6e8eb;
+}
+
+.scene-pane {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+.app-body.stacked .scene-pane {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.sidebar {
+  padding: 12px;
+}
+
+.item-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid #eceff3;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.item-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.item-head .ant-input {
+  flex: 1;
+  font-weight: 600;
+}
+
+.scene-shell {
+  position: absolute;
+  inset: 0;
+}
+
+.scene-hud {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  color: #d5dee8;
+  font-size: 12px;
+  line-height: 1.45;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+  pointer-events: none;
+}
+
+.scene-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #d5dee8;
+  font-size: 16px;
+  pointer-events: none;
+}
+
+.well-label {
+  display: flex;
+  gap: 6px;
+  padding: 2px 6px;
+  color: #fff;
+  background: rgba(12, 16, 22, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+}

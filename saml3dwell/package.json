@@ -1,0 +1,32 @@
+{
+  "name": "saml3dwell",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^5.6.1",
+    "@ant-design/v5-patch-for-react-19": "^1.0.3",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
+    "antd": "^5.27.4",
+    "proj4": "^2.20.3",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@types/proj4": "^2.5.6",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.4",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "vitest": "4.0.18"
+  }
+}
