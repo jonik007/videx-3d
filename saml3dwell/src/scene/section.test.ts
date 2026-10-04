@@ -3,6 +3,7 @@ import poroCube from '../../public/samples/poro.grdecl?raw';
 import { parseEsriAsciiGrid } from '../parsers/esri-ascii';
 import { parseGrdecl } from '../parsers/grdecl';
 import type { PropertyCube } from '../types';
+import { createSceneCrs } from './project';
 import {
   buildStations,
   cubeBands,
@@ -84,5 +85,46 @@ describe('section', () => {
     const traces = surfaceTraces(stations, surface, false);
     expect(traces).toHaveLength(1);
     expect(traces[0].every(point => point.elevation < -1700)).toBe(true);
+  });
+
+  it('covers the sample wells from the first stick to the last', () => {
+    const grid = parseGrdecl(poroCube);
+    const cube: PropertyCube = {
+      id: 'cube',
+      name: 'PORO',
+      visible: true,
+      opacity: 1,
+      depthPositiveDown: true,
+      coordMode: 'wgs84',
+      utmZone: '43N',
+      property: 'PORO',
+      iCut: grid.nx,
+      jCut: grid.ny,
+      kCut: grid.nz,
+      grid,
+    };
+    const { crs } = createSceneCrs([73.4, 61.28]);
+    const wells = [
+      { id: '101', name: '101', longitude: 73.36, latitude: 61.27, rotaryElevation: 52.4 },
+      { id: '102', name: '102', longitude: 73.41, latitude: 61.3, rotaryElevation: 48.1 },
+    ];
+    const anchors = wells.map(well => {
+      const world = crs.wgs84ToWorld(well.longitude, well.latitude, 0);
+      return { ...well, x: world.x, z: world.z };
+    });
+    let length = Math.hypot(anchors[1].x - anchors[0].x, anchors[1].z - anchors[0].z);
+    const path = buildStations(anchors, sectionStep(length), (x, z) => {
+      const geographic = crs.worldToWgs84(x, 0, z);
+      return { longitude: geographic.lng, latitude: geographic.lat };
+    });
+    const bands = cubeBands(path.stations, cube, (longitude, latitude) => [
+      longitude,
+      latitude,
+    ]);
+    const s0 = Math.min(...bands.map(band => band.s0));
+    const s1 = Math.max(...bands.map(band => band.s1));
+    expect(s0).toBe(0);
+    expect(s1).toBeCloseTo(length, 0);
+    expect(path.wells.map(well => well.name)).toEqual(['101', '102']);
   });
 });

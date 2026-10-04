@@ -1,4 +1,4 @@
-import { CameraControls, Html, Line } from '@react-three/drei';
+import { CameraControls, Line, Text } from '@react-three/drei';
 import { Canvas, useThree } from '@react-three/fiber';
 import CameraControlsImpl from 'camera-controls';
 import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react';
@@ -151,6 +151,9 @@ function SectionMesh({
       {wells.map(well => {
         const top = well.rotaryElevation * exaggeration;
         const bottom = foot * exaggeration;
+        const span = Math.max(...wells.map(item => item.s), 600);
+        const fontSize = Math.max(140, span * 0.028);
+        const anchorX = well.s <= 1 ? 'left' : well.s >= span - 1 ? 'right' : 'center';
         return (
           <group key={well.id}>
             <Line
@@ -161,12 +164,17 @@ function SectionMesh({
               color="#ff4d4f"
               lineWidth={2}
             />
-            <Html position={[well.s, top, 3]} center style={{ pointerEvents: 'none' }}>
-              <div className="well-label">
-                <b>{well.name}</b>
-                <span>{formatDistance(well.s)}</span>
-              </div>
-            </Html>
+            <Text
+              position={[well.s, top - fontSize * 0.15, 4]}
+              fontSize={fontSize}
+              color="#ffffff"
+              anchorX={anchorX}
+              anchorY="top"
+              outlineWidth={fontSize * 0.06}
+              outlineColor="#10161c"
+            >
+              {`${well.name}  ${formatDistance(well.s)}`}
+            </Text>
           </group>
         );
       })}
@@ -212,10 +220,10 @@ function SideCamera({
       )
       .then(() =>
         camera.fitToBox(box, false, {
-          paddingTop: 48,
-          paddingBottom: 36,
-          paddingLeft: 48,
-          paddingRight: 24,
+          paddingTop: 72,
+          paddingBottom: 48,
+          paddingLeft: 96,
+          paddingRight: 96,
         }),
       );
   }, [signature, content, size.width, size.height]);

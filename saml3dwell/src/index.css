@@ -132,6 +132,16 @@ body {
   min-height: 0;
 }
 
+.view-pane {
+  position: absolute;
+  inset: 0;
+}
+
+.view-pane.is-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .section-bar {
   display: flex;
   flex-wrap: wrap;

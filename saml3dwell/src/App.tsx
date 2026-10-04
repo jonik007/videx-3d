@@ -59,7 +59,12 @@ function ViewShell() {
         </div>
       )}
       <div className="view-stage">
-        {tab === 'scene' ? <SceneView /> : <SectionCanvas wellIds={sectionWellIds} />}
+        <div className={tab === 'scene' ? 'view-pane' : 'view-pane is-hidden'}>
+          <SceneView />
+        </div>
+        <div className={tab === 'section' ? 'view-pane' : 'view-pane is-hidden'}>
+          <SectionCanvas wellIds={sectionWellIds} />
+        </div>
       </div>
     </div>
   );
