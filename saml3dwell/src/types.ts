@@ -1,4 +1,5 @@
 import type { EsriAsciiGrid } from './parsers/esri-ascii';
+import type { EclipseGrid } from './parsers/grdecl';
 
 export type LonLat = [number, number];
 
@@ -25,6 +26,24 @@ export type Wellhead = {
   /** Альтитуда / амплитуда ротора, м над уровнем моря. */
   rotaryElevation: number;
   visible: boolean;
+};
+
+export type PropertyCube = {
+  id: string;
+  name: string;
+  visible: boolean;
+  opacity: number;
+  /** true: ZCORN — глубина (положительная вниз), как в Eclipse. */
+  depthPositiveDown: boolean;
+  coordMode: 'wgs84' | 'utm';
+  /** Зона UTM, если столбы заданы в метрах. */
+  utmZone: string;
+  property: string;
+  /** Показываются ячейки с индексом строго меньше среза. */
+  iCut: number;
+  jCut: number;
+  kCut: number;
+  grid: EclipseGrid;
 };
 
 export type SurfaceLayer = {

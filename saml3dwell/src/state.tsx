@@ -12,7 +12,17 @@ import {
   parseGeoJsonDocument,
   wellsFromFeatures,
 } from './parsers/geojson';
-import type { LicenseContour, SurfaceLayer, Wellhead } from './types';
+import {
+  defaultPropertyName,
+  inferCoordMode,
+  parseGrdecl,
+} from './parsers/grdecl';
+import type {
+  LicenseContour,
+  PropertyCube,
+  SurfaceLayer,
+  Wellhead,
+} from './types';
 
 export type SceneFocus = {
   id: string;
@@ -23,6 +33,7 @@ type SceneState = {
   licenses: LicenseContour[];
   wells: Wellhead[];
   surfaces: SurfaceLayer[];
+  cubes: PropertyCube[];
   exaggeration: number;
   showVolume: boolean;
   showGrid: boolean;
@@ -31,12 +42,15 @@ type SceneState = {
   addLicenses: (items: LicenseContour[]) => void;
   addWells: (items: Wellhead[]) => void;
   addSurface: (item: SurfaceLayer) => void;
+  addCube: (item: PropertyCube) => void;
   updateLicense: (id: string, patch: Partial<LicenseContour>) => void;
   updateWell: (id: string, patch: Partial<Wellhead>) => void;
   updateSurface: (id: string, patch: Partial<SurfaceLayer>) => void;
+  updateCube: (id: string, patch: Partial<PropertyCube>) => void;
   removeLicense: (id: string) => void;
   removeWell: (id: string) => void;
   removeSurface: (id: string) => void;
+  removeCube: (id: string) => void;
   setExaggeration: (value: number) => void;
   setShowVolume: (value: boolean) => void;
   setShowGrid: (value: boolean) => void;
@@ -60,6 +74,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
   const [licenses, setLicenses] = useState<LicenseContour[]>([]);
   const [wells, setWells] = useState<Wellhead[]>([]);
   const [surfaces, setSurfaces] = useState<SurfaceLayer[]>([]);
+  const [cubes, setCubes] = useState<PropertyCube[]>([]);
   const [exaggeration, setExaggeration] = useState(6);
   const [showVolume, setShowVolume] = useState(true);
   const [showGrid, setShowGrid] = useState(true);
@@ -74,6 +89,9 @@ export function SceneProvider({ children }: { children: ReactNode }) {
   }, []);
   const addSurface = useCallback((item: SurfaceLayer) => {
     setSurfaces(current => [...current, item]);
+  }, []);
+  const addCube = useCallback((item: PropertyCube) => {
+    setCubes(current => [...current, item]);
   }, []);
   const updateLicense = useCallback(
     (id: string, patch: Partial<LicenseContour>) => {
@@ -96,6 +114,11 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     },
     [],
   );
+  const updateCube = useCallback((id: string, patch: Partial<PropertyCube>) => {
+    setCubes(current =>
+      current.map(item => (item.id === id ? { ...item, ...patch } : item)),
+    );
+  }, []);
   const removeLicense = useCallback((id: string) => {
     setLicenses(current => current.filter(item => item.id !== id));
   }, []);
@@ -105,6 +128,9 @@ export function SceneProvider({ children }: { children: ReactNode }) {
   const removeSurface = useCallback((id: string) => {
     setSurfaces(current => current.filter(item => item.id !== id));
   }, []);
+  const removeCube = useCallback((id: string) => {
+    setCubes(current => current.filter(item => item.id !== id));
+  }, []);
   const focusWell = useCallback((id: string) => {
     setFocus({ id, nonce: Date.now() });
   }, []);
@@ -112,18 +138,21 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     setLicenses([]);
     setWells([]);
     setSurfaces([]);
+    setCubes([]);
     setFocus(null);
   }, []);
 
   const loadSample = useCallback(async () => {
-    const [licenseText, wellText, surfaceText] = await Promise.all([
+    const [licenseText, wellText, surfaceText, cubeText] = await Promise.all([
       readSample('/samples/licenses.geojson'),
       readSample('/samples/wellheads.geojson'),
       readSample('/samples/horizon.asc'),
+      readSample('/samples/poro.grdecl'),
     ]);
     const licenseDoc = parseGeoJsonDocument(licenseText);
     const wellDoc = parseGeoJsonDocument(wellText);
     const grid = parseEsriAsciiGrid(surfaceText);
+    const cubeGrid = parseGrdecl(cubeText);
     const { licenses: nextLicenses, warnings: licenseWarnings } =
       licensesFromFeatures(licenseDoc.features);
     const { wells: nextWells, warnings: wellWarnings } = wellsFromFeatures(
@@ -144,8 +173,24 @@ export function SceneProvider({ children }: { children: ReactNode }) {
         grid,
       },
     ]);
+    setCubes([
+      {
+        id: crypto.randomUUID(),
+        name: 'Пористость',
+        visible: true,
+        opacity: 1,
+        depthPositiveDown: true,
+        coordMode: inferCoordMode(cubeGrid),
+        utmZone: '43N',
+        property: defaultPropertyName(cubeGrid),
+        iCut: cubeGrid.nx,
+        jCut: cubeGrid.ny,
+        kCut: cubeGrid.nz,
+        grid: cubeGrid,
+      },
+    ]);
     setFocus(null);
-    return [...licenseWarnings, ...wellWarnings];
+    return [...licenseWarnings, ...wellWarnings, ...cubeGrid.warnings];
   }, []);
 
   const value = useMemo<SceneState>(
@@ -153,6 +198,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
       licenses,
       wells,
       surfaces,
+      cubes,
       exaggeration,
       showVolume,
       showGrid,
@@ -161,12 +207,15 @@ export function SceneProvider({ children }: { children: ReactNode }) {
       addLicenses,
       addWells,
       addSurface,
+      addCube,
       updateLicense,
       updateWell,
       updateSurface,
+      updateCube,
       removeLicense,
       removeWell,
       removeSurface,
+      removeCube,
       setExaggeration,
       setShowVolume,
       setShowGrid,
@@ -179,6 +228,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
       licenses,
       wells,
       surfaces,
+      cubes,
       exaggeration,
       showVolume,
       showGrid,
@@ -187,12 +237,15 @@ export function SceneProvider({ children }: { children: ReactNode }) {
       addLicenses,
       addWells,
       addSurface,
+      addCube,
       updateLicense,
       updateWell,
       updateSurface,
+      updateCube,
       removeLicense,
       removeWell,
       removeSurface,
+      removeCube,
       focusWell,
       clearAll,
       loadSample,

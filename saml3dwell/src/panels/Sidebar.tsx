@@ -11,13 +11,14 @@ import {
   Input,
   InputNumber,
   Modal,
+  Select,
   Slider,
   Space,
   Switch,
   Typography,
   Upload,
 } from 'antd';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { parseCoordinateList } from '../parsers/coordinates';
 import {
   displayStride,
@@ -30,8 +31,21 @@ import {
   parseGeoJsonDocument,
   wellsFromFeatures,
 } from '../parsers/geojson';
+import {
+  cubeStride,
+  defaultPropertyName,
+  inferCoordMode,
+  parseGrdecl,
+  propertyStats,
+} from '../parsers/grdecl';
+import { formatUtmZone } from '../scene/project';
 import { useScene } from '../state';
-import { paletteColor, type LicenseContour, type SurfaceLayer } from '../types';
+import {
+  paletteColor,
+  type LicenseContour,
+  type PropertyCube,
+  type SurfaceLayer,
+} from '../types';
 
 function errorText(error: unknown) {
   return error instanceof Error ? error.message : 'Не удалось прочитать файл';
@@ -61,7 +75,7 @@ export function Sidebar() {
         type="info"
         showIcon
         message="Система координат — WGS84"
-        description="GeoJSON и ESRI ASCII Grid читаются как долгота и широта в градусах. Сцена строится в метрах UTM на эллипсоиде WGS84."
+        description="GeoJSON и ESRI ASCII Grid читаются как долгота и широта в градусах. Куб GRDECL может быть в градусах или в метрах UTM. Сцена строится в метрах UTM на эллипсоиде WGS84."
       />
       <Space style={{ margin: '12px 0' }}>
         <Button type="primary" loading={loadingSample} onClick={() => void loadSample()}>
@@ -70,7 +84,7 @@ export function Sidebar() {
         <Button onClick={scene.clearAll}>Очистить</Button>
       </Space>
       <Collapse
-        defaultActiveKey={['licenses', 'wells', 'surfaces', 'scene']}
+        defaultActiveKey={['licenses', 'wells', 'surfaces', 'cubes', 'scene']}
         items={[
           {
             key: 'licenses',
@@ -86,6 +100,11 @@ export function Sidebar() {
             key: 'surfaces',
             label: `Поверхности (${scene.surfaces.length})`,
             children: <SurfacePanel />,
+          },
+          {
+            key: 'cubes',
+            label: `Кубы свойств (${scene.cubes.length})`,
+            children: <CubePanel />,
           },
           {
             key: 'scene',
@@ -640,6 +659,210 @@ function SurfacePanel() {
                 <span>Каркас</span>
               </Space>
             </Space>
+          </div>
+        );
+      })}
+    </Space>
+  );
+}
+
+function formatCubeStat(value: number) {
+  const abs = Math.abs(value);
+  if (abs !== 0 && (abs < 0.01 || abs >= 1000)) return value.toExponential(2);
+  if (abs >= 10) return value.toFixed(1);
+  return value.toFixed(3);
+}
+
+function ZoneField({
+  zone,
+  onCommit,
+}: {
+  zone: string;
+  onCommit: (zone: string) => void;
+}) {
+  const { message } = App.useApp();
+  const [draft, setDraft] = useState(zone);
+
+  useEffect(() => {
+    setDraft(zone);
+  }, [zone]);
+
+  return (
+    <Input
+      size="small"
+      value={draft}
+      style={{ width: 88 }}
+      onChange={event => setDraft(event.target.value.toUpperCase())}
+      onBlur={() => {
+        try {
+          const next = formatUtmZone(draft);
+          setDraft(next);
+          if (next !== zone) onCommit(next);
+        } catch {
+          setDraft(zone);
+          message.warning('Зона UTM вида 43N');
+        }
+      }}
+      onPressEnter={event => event.currentTarget.blur()}
+    />
+  );
+}
+
+function CubePanel() {
+  const { message } = App.useApp();
+  const { cubes, addCube, updateCube, removeCube } = useScene();
+
+  const accept = (text: string, filename: string) => {
+    const grid = parseGrdecl(text);
+    const cube: PropertyCube = {
+      id: crypto.randomUUID(),
+      name: filename.replace(/\.[^.]+$/, '') || `Куб ${cubes.length + 1}`,
+      visible: true,
+      opacity: 1,
+      depthPositiveDown: true,
+      coordMode: inferCoordMode(grid),
+      utmZone: '43N',
+      property: defaultPropertyName(grid),
+      iCut: grid.nx,
+      jCut: grid.ny,
+      kCut: grid.nz,
+      grid,
+    };
+    addCube(cube);
+    grid.warnings.forEach(warning => message.warning(warning));
+    const mode = cube.coordMode === 'wgs84' ? 'WGS84' : 'UTM';
+    message.success(
+      `${cube.name}: ${grid.nx}×${grid.ny}×${grid.nz}, ${mode}, ${cube.property}`,
+    );
+  };
+
+  return (
+    <Space direction="vertical" size={12} style={{ width: '100%' }}>
+      <Upload
+        accept=".grdecl,.inc,.txt,.data"
+        showUploadList={false}
+        beforeUpload={file => {
+          void file.text().then(
+            text => {
+              try {
+                accept(text, file.name);
+              } catch (error) {
+                message.error(errorText(error));
+              }
+            },
+            () => message.error('Не удалось прочитать файл'),
+          );
+          return false;
+        }}
+      >
+        <Button icon={<UploadOutlined />}>Eclipse GRDECL</Button>
+      </Upload>
+      <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
+        Corner-point (SPECGRID, COORD, ZCORN) или декартова сетка DX, DY, DZ и
+        TOPS. Свойство — массив NX·NY·NZ, например PORO или PERMX. Если столбы
+        в градусах, выбирается WGS84, иначе метры UTM. INCLUDE не раскрывается.
+      </Typography.Paragraph>
+      {cubes.map(cube => {
+        const stats = propertyStats(cube.grid, cube.property);
+        const stride = cubeStride(cube.grid.nx, cube.grid.ny, cube.grid.nz);
+        const names = Object.keys(cube.grid.properties);
+        const cuts = [
+          ['iCut', 'I', cube.grid.nx],
+          ['jCut', 'J', cube.grid.ny],
+          ['kCut', 'K', cube.grid.nz],
+        ] as const;
+        return (
+          <div key={cube.id} className="item-card">
+            <div className="item-head">
+              <Input
+                value={cube.name}
+                variant="borderless"
+                onChange={event =>
+                  updateCube(cube.id, { name: event.target.value })
+                }
+              />
+              <Switch
+                checked={cube.visible}
+                onChange={visible => updateCube(cube.id, { visible })}
+              />
+              <Button
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => removeCube(cube.id)}
+              />
+            </div>
+            <Typography.Text type="secondary">
+              {cube.grid.nx}×{cube.grid.ny}×{cube.grid.nz} ·{' '}
+              {formatCubeStat(stats.min)}…{formatCubeStat(stats.max)} ·{' '}
+              {stats.count} яч.
+              {stride > 1 ? ` · шаг отображения ×${stride}` : ''}
+            </Typography.Text>
+            <Space wrap>
+              <Typography.Text>Свойство</Typography.Text>
+              <Select
+                size="small"
+                value={cube.property}
+                style={{ minWidth: 110 }}
+                options={names.map(name => ({ value: name, label: name }))}
+                onChange={property => updateCube(cube.id, { property })}
+              />
+            </Space>
+            <Typography.Text>Непрозрачность</Typography.Text>
+            <Slider
+              min={0.05}
+              max={1}
+              step={0.05}
+              value={cube.opacity}
+              onChange={opacity => updateCube(cube.id, { opacity })}
+            />
+            <Space>
+              <Switch
+                checked={cube.depthPositiveDown}
+                onChange={depthPositiveDown =>
+                  updateCube(cube.id, { depthPositiveDown })
+                }
+              />
+              <span>Значения Z — глубина (вниз)</span>
+            </Space>
+            <Space wrap>
+              <Select
+                size="small"
+                value={cube.coordMode}
+                style={{ minWidth: 150 }}
+                options={[
+                  { value: 'wgs84', label: 'WGS84, градусы' },
+                  { value: 'utm', label: 'UTM, метры' },
+                ]}
+                onChange={coordMode =>
+                  updateCube(cube.id, {
+                    coordMode: coordMode as PropertyCube['coordMode'],
+                  })
+                }
+              />
+              {cube.coordMode === 'utm' && (
+                <ZoneField
+                  zone={cube.utmZone}
+                  onCommit={utmZone => updateCube(cube.id, { utmZone })}
+                />
+              )}
+            </Space>
+            {cuts.map(([key, label, max]) => (
+              <div key={key}>
+                <Typography.Text>
+                  {label}: {cube[key]} из {max}
+                </Typography.Text>
+                <Slider
+                  min={1}
+                  max={max}
+                  value={cube[key]}
+                  onChange={value => updateCube(cube.id, { [key]: value })}
+                />
+              </div>
+            ))}
+            <Typography.Text type="secondary">
+              Показаны ячейки с индексом меньше выбранного.
+            </Typography.Text>
           </div>
         );
       })}

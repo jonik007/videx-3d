@@ -3,7 +3,9 @@ import type { CRS } from '../../../src/sdk/projection/crs';
 import type { WorldPoint } from './geometry';
 
 type FrameContextValue = {
+  zone: string;
   toWorld: (longitude: number, latitude: number, elevation?: number) => WorldPoint;
+  toUtm: (easting: number, northing: number, elevation?: number) => WorldPoint;
 };
 
 const FrameContext = createContext<FrameContextValue | null>(null);
@@ -14,19 +16,26 @@ const FrameContext = createContext<FrameContextValue | null>(null);
  */
 export function Wgs84Frame({
   crs,
+  zone,
   children,
 }: {
   crs: CRS;
+  zone: string;
   children: ReactNode;
 }) {
   const value = useMemo<FrameContextValue>(
     () => ({
+      zone,
       toWorld(longitude, latitude, elevation = 0) {
         const point = crs.wgs84ToWorld(longitude, latitude, elevation);
         return [point.x, point.y, point.z];
       },
+      toUtm(easting, northing, elevation = 0) {
+        const point = crs.utmToWorld(easting, northing, elevation);
+        return [point.x, point.y, point.z];
+      },
     }),
-    [crs],
+    [crs, zone],
   );
 
   return <FrameContext.Provider value={value}>{children}</FrameContext.Provider>;
