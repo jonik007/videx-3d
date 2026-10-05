@@ -4,6 +4,7 @@ import {
   gridExtent,
   isNodata,
   parseEsriAsciiGrid,
+  sampleGrid,
   valueAt,
 } from './esri-ascii';
 
@@ -65,6 +66,14 @@ describe('parseEsriAsciiGrid', () => {
         1 2 3
       `),
     ).toThrow(/получено 3/);
+  });
+
+  it('samples a cell center and returns null outside the grid', () => {
+    const grid = parseEsriAsciiGrid(SAMPLE);
+    expect(sampleGrid(grid, 10.5, 20.5)).toBe(3);
+    expect(sampleGrid(grid, 11.5, 21.5)).toBe(2);
+    expect(sampleGrid(grid, 11, 20.5)).toBeCloseTo(3.5);
+    expect(sampleGrid(grid, 0, 0)).toBeNull();
   });
 
   it('treats the declared nodata and huge sentinels as empty', () => {
